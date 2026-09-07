@@ -1,6 +1,8 @@
 const express = require('express');
 const userRoutes = require('./routes/userRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const productRoutes = require('./routes/productRoutes');
+
 require('dotenv').config();
 
 const app = express();
@@ -10,6 +12,7 @@ const PORT = process.env.PORT || 5000;
 
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/products', productRoutes);
 
 app.get('/', (_req, res) => {
   res.send('Mini IMS API is running');
