@@ -36,4 +36,43 @@ const createProduct = async (req, res) => {
     }
 }
 
-module.exports = { createProduct };
+const getAllProducts = async (req, res) => {
+    try{
+        const products = await pool.query(
+            `SELECT products.*, categories.name AS category_name
+            FROM products
+            LEFT JOIN categories ON products.category_id = categories.id`
+        )
+        return res.status(200).json(products.rows)
+    }catch(error){
+        console.error('Error fetching categories:', error);
+        return res.status(500).json({
+            message: 'Internal server error'
+        });
+    }
+}
+
+const getProductById = async(req, res) =>{
+    const {id} = req.params;
+    try{
+        const product = await pool.query(
+            `SELECT products.*, categories.name AS category_name
+            FROM products
+            LEFT JOIN categories ON products.category_id = categories.id
+            WHERE products.id = $1`, [id]
+        )
+        if(product.rowCount === 0){
+            return res.status(404).json({
+                message: 'Product not found'
+            });
+        }
+        return res.status(200).json(product.rows[0])
+    }catch(error){
+        console.log("Fetching Product By Id error");
+        return res.status(500).json({
+            message : 'Internal Server Problem'
+        })
+    }
+}
+
+module.exports = { createProduct, getAllProducts, getProductById };
