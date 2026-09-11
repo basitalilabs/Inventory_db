@@ -1,109 +1,78 @@
-const pool = require('../config/db');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const pool = require("../config/db");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const catchAsync = require("../utils/catchAsync");
+const AppError = require("../utils/appError");
 
-const registerUser =  async (req, res) => {
-    // destructure the request body to get the username, email, and password
-    const { name, email, password } = req.body;
+const registerUser = catchAsync(async (req, res) => {
+  const { name, email, password } = req.body;
 
-    //validate that all required fields are present
-    if (!name || !email || !password) {
-        return res.status(400).json({
-            message: 'Username, email, and password are required'
-        })
-    }
+  if (!name || !email || !password) {
+    throw new AppError("Username, email, and password are required", 400);
+  }
 
-    // validate that the password is at least 8 characters long
-    if(password.length < 8){
-        return res.status(400).json({
-            message: 'Password must be at least 8 characters long'
-        })
-    }
+  if (password.length < 8) {
+    throw new AppError("Password must be at least 8 characters long", 400);
+  }
 
-    //validate email format using regex
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if(emailRegex.test(email) === false){
-        return res.status(400).json({
-            message: 'Invalid email format'
-        })
-    }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (emailRegex.test(email) === false) {
+    throw new AppError("Invalid email format", 400);
+  }
 
-    // if email already exists in the database, return an error
-    
-    try {
-        const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-        if (existingUser.rowCount > 0) {
-            return res.status(400).json({
-                message: 'Email already exists'
-            });
-        }
-        
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = await pool.query(
-          "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, created_at",
-          [name, email, hashedPassword],
-        );
+  const existingUser = await pool.query(
+    "SELECT * FROM users WHERE email = $1",
+    [email]
+  );
+  if (existingUser.rowCount > 0) {
+    throw new AppError("Email already exists", 400);
+  }
 
-        if(newUser.rowCount > 0){
-            return res.status(201).json({
-                message: 'User created successfully',
-                user: newUser.rows[0]
-            });
-        }else{
-            return res.status(500).json({
-                message: 'Failed to create user'
-            })
-        }
-    }catch (error){
-        return res.status(500).json({
-            message: 'Internal server error'
-        })
-    }
-}
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const newUser = await pool.query(
+    "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, created_at",
+    [name, email, hashedPassword]
+  );
 
-const loginUser = async (req, res) => {
-    const { email, password } = req.body;
+  return res.status(201).json({
+    success: true,
+    message: "User created successfully",
+    data: newUser.rows[0],
+  });
+});
 
-    if(!email || !password){
-        return res.status(400).json({
-            message: 'Email and password are required'
-        })
-    }
+const loginUser = catchAsync(async (req, res) => {
+  const { email, password } = req.body;
 
-    try{
-        const user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-        if (user.rowCount === 0) {
-            return res.status(400).json({
-                message: 'Invalid email or password'
-            });
-        }
+  if (!email || !password) {
+    throw new AppError("Email and password are required", 400);
+  }
 
-        const isMatch = await bcrypt.compare(password, user.rows[0].password);
-        if (!isMatch) {
-            return res.status(400).json({
-                message: 'Invalid email or password'
-            });
-        }
+  const user = await pool.query("SELECT * FROM users WHERE email = $1", [
+    email,
+  ]);
+  if (user.rowCount === 0) {
+    throw new AppError("Invalid email or password", 400);
+  }
 
-        const token = jwt.sign(
-          { id: user.rows[0].id, email: user.rows[0].email },
-          process.env.JWT_SECRET,
-          { expiresIn: "1h" },
-        );
+  const isMatch = await bcrypt.compare(password, user.rows[0].password);
+  if (!isMatch) {
+    throw new AppError("Invalid email or password", 400);
+  }
 
-        const { password: _, ...safeUser } = user.rows[0];
+  const token = jwt.sign(
+    { id: user.rows[0].id, email: user.rows[0].email },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" },
+  );
 
-        return res.status(200).json({
-            message: 'Login successful',
-            token: token,
-            user: safeUser
-        });
+  const { password: _, ...safeUser } = user.rows[0];
 
-    }catch (error){
-        return res.status(500).json({
-            message: 'Internal server error'
-        })
-    }
-}
+  return res.status(200).json({
+    success: true,
+    message: "Login successful",
+    data: { token, user: safeUser },
+  });
+});
 
 module.exports = { registerUser, loginUser };

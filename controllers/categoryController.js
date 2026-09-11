@@ -1,125 +1,101 @@
-const pool = require('../config/db');
+const pool = require("../config/db");
+const catchAsync = require("../utils/catchAsync");
+const AppError = require("../utils/appError");
 
-const createCategory = async (req, res) => {
-    const { name } = req.body;
+const createCategory = catchAsync(async (req, res) => {
+  const { name } = req.body;
 
-    if (!name) {
-        return res.status(400).json({
-            message: "Name field is required"
-        })
-    }
+  if (!name) {
+    throw new AppError("Name field is required", 400);
+  }
 
-    try {
+  const existingCategory = await pool.query(
+    "SELECT * FROM categories WHERE name = $1",
+    [name],
+  );
 
-        const existingCategory = await pool.query('SELECT * FROM categories WHERE name = $1', [name]);
+  if (existingCategory.rowCount > 0) {
+    throw new AppError("Category with this name already exists", 400);
+  }
 
-        if (existingCategory.rowCount > 0) {
-            return res.status(400).json({
-                message: 'Category with this name already exists'
-            })
-        }
+  const newCategory = await pool.query(
+    "INSERT INTO categories (name) VALUES ($1) RETURNING *",
+    [name],
+  );
 
-        const newCategory = await pool.query('INSERT INTO categories (name) VALUES ($1) RETURNING *', [name]);
+  return res.status(201).json({ success: true, data: newCategory.rows[0] });
+});
 
-        return res.status(201).json(newCategory.rows[0]);
-    } catch (error) {
+const getAllCategories = catchAsync(async (req, res) => {
+  const categories = await pool.query(
+    "SELECT * FROM categories ORDER BY id ASC",
+  );
+  return res.status(200).json({ success: true, data: categories.rows });
+});
 
-        console.error('Error creating category:', error);
+const getCategoryById = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const category = await pool.query("SELECT * FROM categories WHERE id = $1", [
+    id,
+  ]);
+  if (category.rowCount === 0) {
+    throw new AppError("Category not found", 404);
+  }
+  return res.status(200).json({ success: true, data: category.rows[0] });
+});
 
-        return res.status(500).json({
-            message: 'Internal server error'
-        });
-    }
-}
+const updateCategory = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
 
-const getAllCategories = async (req, res) => {
-    try{
-        const categories = await pool.query('SELECT * FROM categories ORDER BY id ASC');
-        return res.status(200).json(categories.rows);
-    }catch(error){
-        console.error('Error fetching categories:', error);
-        return res.status(500).json({
-            message: 'Internal server error'
-        });
-    }
-}
+  if (!name) {
+    throw new AppError("Name field is required", 400);
+  }
 
-const getCategoryById = async (req, res) => {
-    const { id } = req.params;
-    try{
-        const category = await pool.query('SELECT * FROM categories WHERE id = $1', [id]);
-        if(category.rowCount === 0){
-            return res.status(404).json({
-                message: 'Category not found'
-            });
-        }
-        return res.status(200).json(category.rows[0]);
-    }catch(error){
-        console.error('Error fetching category by ID:', error);
-        return res.status(500).json({
-            message: 'Internal server error'
-        });
-    }
-}
+  const existingCategory = await pool.query(
+    "SELECT * FROM categories WHERE id = $1",
+    [id],
+  );
 
-const updateCategory = async (req, res) => {
-    const {id} = req.params;
-    const {name} = req.body;
+  if (existingCategory.rowCount === 0) {
+    throw new AppError("Category not found", 404);
+  }
 
-    if (!name) {
-        return res.status(400).json({
-            message: "Name field is required"
-        })
-    }
+  const duplicateCheck = await pool.query(
+    "SELECT * FROM categories WHERE name = $1 AND id != $2",
+    [name, id],
+  );
 
-    try{
-        const existingCategory = await pool.query('SELECT * FROM categories WHERE id = $1', [id]);
+  if (duplicateCheck.rowCount > 0) {
+    throw new AppError("Another category with this name already exists", 400);
+  }
 
-        if (existingCategory.rowCount === 0) {
-            return res.status(404).json({
-                message: 'Category not found'
-            })
-        }
+  const updateCategory = await pool.query(
+    "UPDATE categories SET name=$1 WHERE id = $2 RETURNING *",
+    [name, id],
+  );
+  return res.status(200).json({ success: true, data: updateCategory.rows[0] });
+});
 
-        const duplicateCheck = await pool.query('SELECT * FROM categories WHERE name = $1 AND id != $2', [name, id]);
+const deleteCategory = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const existingCategory = await pool.query(
+    "SELECT * FROM categories WHERE id = $1",
+    [id],
+  );
 
-        if(duplicateCheck.rowCount > 0){
-            return res.status(400).json({
-                message: 'Another category with this name already exists'
-            })
-        }
-        
-        const updateCategory = await pool.query('UPDATE categories SET name=$1 WHERE id = $2 RETURNING *', [name, id]);
-        return res.status(200).json(updateCategory.rows[0]);
+  if (existingCategory.rowCount === 0) {
+    throw new AppError("Category not found", 404);
+  }
 
-    }catch(error){
-        console.error('Error updating category by ID:', error);
-        return res.status(500).json({
-            message: 'Internal server error'
-        });
-    }
-}
+  await pool.query("DELETE FROM categories WHERE id = $1", [id]);
+  return res.status(200).json({ success: true, message: "Category successfully deleted" });
+});
 
-const deleteCategory = async (req, res) => {
-    const {id} = req.params;
-    try{
-        const existingCategory = await pool.query('SELECT * FROM categories WHERE id = $1', [id]);
-        
-        if(existingCategory.rowCount === 0){
-            return res.status(404).json({
-                message: 'Category not found'
-            });
-        }
-
-        await pool.query('DELETE FROM categories WHERE id = $1', [id]);
-        return res.status(200).json({ message: 'Category successfully deleted' });
-
-    }catch(error){
-        console.error('Error deleting category by ID:', error);
-        return res.status(500).json({
-            message: 'Internal server error'
-        });
-    }
-}
-
-module.exports = {createCategory, getAllCategories, getCategoryById, updateCategory, deleteCategory};
+module.exports = {
+  createCategory,
+  getAllCategories,
+  getCategoryById,
+  updateCategory,
+  deleteCategory,
+};
