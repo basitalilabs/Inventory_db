@@ -7,19 +7,6 @@ const AppError = require("../utils/appError");
 const registerUser = catchAsync(async (req, res) => {
   const { name, email, password } = req.body;
 
-  if (!name || !email || !password) {
-    throw new AppError("Username, email, and password are required", 400);
-  }
-
-  if (password.length < 8) {
-    throw new AppError("Password must be at least 8 characters long", 400);
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (emailRegex.test(email) === false) {
-    throw new AppError("Invalid email format", 400);
-  }
-
   const existingUser = await pool.query(
     "SELECT * FROM users WHERE email = $1",
     [email]
@@ -43,10 +30,6 @@ const registerUser = catchAsync(async (req, res) => {
 
 const loginUser = catchAsync(async (req, res) => {
   const { email, password } = req.body;
-
-  if (!email || !password) {
-    throw new AppError("Email and password are required", 400);
-  }
 
   const user = await pool.query("SELECT * FROM users WHERE email = $1", [
     email,
