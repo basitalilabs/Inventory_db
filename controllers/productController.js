@@ -27,14 +27,32 @@ const createProduct = catchAsync(async (req, res) => {
 });
 
 const getAllProducts = catchAsync(async (req, res) => {
+  const {page, limit} = req.query;
+
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 10;
+  const offset = (pageNumber - 1) * limitNumber;
   const products = await pool.query(
-    `SELECT products.*, categories.name AS category_name
-            FROM products
-            LEFT JOIN categories ON products.category_id = categories.id`,
+   `SELECT products.*, categories.name AS category_name
+    FROM products
+    LEFT JOIN categories ON products.category_id = categories.id
+    LIMIT $1 OFFSET $2`, 
+    [limitNumber, offset]
   );
-  return res
-    .status(200)
-    .json({ success: true, message: "Products fetched successfully", data: products.rows });
+  const totalCount = await pool.query('SELECT COUNT(*) FROM products');
+  const totalItem = parseInt(totalCount.rows[0].count);
+  const totalPages = Math.ceil(totalItem / limitNumber);
+  return res.status(200).json({ 
+        success: true, 
+        message: "Products fetched successfully", 
+        data: products.rows,
+        pagination: {
+            currentPage: pageNumber,
+            totalPages,
+            totalItem,
+            limit: limitNumber
+        }
+    });
 });
 
 const getProductById = catchAsync(async (req, res) => {
