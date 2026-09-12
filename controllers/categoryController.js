@@ -5,10 +5,6 @@ const AppError = require("../utils/appError");
 const createCategory = catchAsync(async (req, res) => {
   const { name } = req.body;
 
-  if (!name) {
-    throw new AppError("Name field is required", 400);
-  }
-
   const existingCategory = await pool.query(
     "SELECT * FROM categories WHERE name = $1",
     [name],
@@ -48,10 +44,6 @@ const updateCategory = catchAsync(async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
 
-  if (!name) {
-    throw new AppError("Name field is required", 400);
-  }
-
   const existingCategory = await pool.query(
     "SELECT * FROM categories WHERE id = $1",
     [id],
@@ -70,11 +62,11 @@ const updateCategory = catchAsync(async (req, res) => {
     throw new AppError("Another category with this name already exists", 400);
   }
 
-  const updateCategory = await pool.query(
+  const updatedCategory = await pool.query(
     "UPDATE categories SET name=$1 WHERE id = $2 RETURNING *",
     [name, id],
   );
-  return res.status(200).json({ success: true, data: updateCategory.rows[0] });
+  return res.status(200).json({ success: true, data: updatedCategory.rows[0] });
 });
 
 const deleteCategory = catchAsync(async (req, res) => {

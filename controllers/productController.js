@@ -5,18 +5,6 @@ const AppError = require("../utils/appError");
 const createProduct = catchAsync(async (req, res) => {
   const { name, description, price, stock, category_id } = req.body;
 
-  if (!name || !price || !stock || !category_id) {
-    throw new AppError("Please provide all required fields", 400);
-  }
-
-  if (isNaN(price) || isNaN(stock)) {
-    throw new AppError("Price and stock must be numbers", 400);
-  }
-
-  if (price <= 0 || stock < 0) {
-    throw new AppError("Price and stock must be non-negative", 400);
-  }
-
   const categoryCheck = await pool.query(
     "SELECT * FROM categories WHERE id = $1",
     [category_id],
@@ -69,18 +57,6 @@ const getProductById = catchAsync(async (req, res) => {
 const updateProductById = catchAsync(async (req, res) => {
   const { name, description, price, stock, category_id } = req.body;
   const { id } = req.params;
-
-  if (!name || !price || !stock || !category_id) {
-    throw new AppError("Please provide all required fields", 400);
-  }
-
-  if (isNaN(price) || isNaN(stock)) {
-    throw new AppError("Price and stock must be numbers", 400);
-  }
-
-  if (price <= 0 || stock < 0) {
-    throw new AppError("Price and stock must be non-negative", 400);
-  }
 
   const existingProduct = await pool.query(
     "SELECT * FROM products WHERE id = $1",
